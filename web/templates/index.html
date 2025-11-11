@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RISC-V Web Assembler</title>
+    <!-- 1. Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. CodeMirror Core CSS & JS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+    
+    <!-- 3. CodeMirror Language Mode (GNU Assembler) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/gas/gas.min.js"></script>
+    
+    <!-- 4. CodeMirror Theme (VS Code Dark) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/vsc-dark.min.css">
+
+    <!-- 5. Lucide Icons script (Removed: Causes React error and is not used) -->
+    <!-- <script src="https://unpkg.com/lucide-react@0.395.0/dist/umd/lucide-react.min.js"></script> -->
+
+    <!-- 6. Custom Styles to blend CodeMirror with Tailwind & add custom colors -->
+    <style>
+        /* Use Inter font for UI, Fira Code (via tailwind.config) for code */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        /* --- CodeMirror Styling --- */
+        
+        /* Set font for CodeMirror editor */
+        .cm-s-vsc-dark {
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            font-size: 0.875rem; /* 14px */
+        }
+
+        /* Set border, radius, and background to match Tailwind's dark theme */
+        .CodeMirror {
+            border: 1px solid #3f3f46; /* zinc-700 */
+            border-radius: 0.375rem; /* rounded-md */
+            height: 100%;
+            background-color: #18181b; /* zinc-900 */
+        }
+
+        /* Ensure the theme background is applied */
+        .cm-s-vsc-dark.CodeMirror {
+            background-color: #18181b; /* zinc-900 */
+            color: #d4d4d4; /* zinc-300 */
+        }
+        
+        /* Gutter (line numbers) styling */
+        .cm-s-vsc-dark .CodeMirror-gutters {
+            background-color: #18181b; /* zinc-900 */
+            border-right: 1px solid #3f3f46; /* zinc-700 */
+        }
+        .cm-s-vsc-dark .CodeMirror-linenumber {
+            color: #52525b; /* zinc-600 */
+        }
+
+        /* Cursor color */
+        .cm-s-vsc-dark .CodeMirror-cursor {
+            border-left: 2px solid #a1a1aa; /* zinc-400 */
+        }
+
+        /* Selection styling */
+        .cm-s-vsc-dark .CodeMirror-selected {
+            background: rgba(90, 90, 130, 0.4);
+        }
+
+        /* --- Custom Syntax Highlighting (New Scheme) --- */
+        
+        /* Opcodes (add, addi, etc.) -> Light Orange */
+        .cm-s-vsc-dark .cm-keyword {
+            color: #f29e74; /* Light Orange */
+        }
+
+        /* Registers (x1, x2, etc.) -> Deep Peach */
+        .cm-s-vsc-dark .cm-variable,
+        .cm-s-vsc-dark .cm-variable-2,
+        .cm-s-vsc-dark .cm-variable-3 {
+            color: #f2b279; /* Deep Peach */
+        }
+
+        /* Immediates/Constants (10, 0x10000) -> Light Orange */
+        .cm-s-vsc-dark .cm-number {
+            color: #f29e74; /* Light Orange */
+        }
+
+        /* Comments (# ...) -> Muted Grey */
+        .cm-s-vsc-dark .cm-comment {
+            color: #6a737d; /* Muted Grey (Correct) */
+        }
+
+        /* Directives (.data, .word) -> Deep Orange */
+        .cm-s-vsc-dark .cm-def {
+            color: #d1742c; /* Deep Orange */
+        }
+        .cm-s-vsc-dark .cm-meta {
+            color: #d1742c; /* Deep Orange */
+        }
+
+        /* Labels (label:) -> Deep Peach (like other arguments) */
+        .cm-s-vsc-dark .cm-qualifier {
+            color: #f2b279; /* Deep Peach */
+        }
+
+        /* --- End Custom Syntax Highlighting --- */
+
+
+        /* Custom scrollbar to match dark theme */
+        .CodeMirror-vscrollbar::-webkit-scrollbar,
+        .CodeMirror-hscrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .CodeMirror-vscrollbar::-webkit-scrollbar-track,
+        .CodeMirror-hscrollbar::-webkit-scrollbar-track {
+            background: #2727a0; /* zinc-800 */
+            border-radius: 4px;
+        }
+        .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
+        .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {
+            background-color: #52525b; /* zinc-600 */
+            border-radius: 4px;
+        }
+        .CodeMirror-vscrollbar::-webkit-scrollbar-thumb:hover,
+        .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #71717a; /* zinc-500 */
+        }
+
+        /* --- End CodeMirror Styling --- */
+
+        /* Custom scrollbar for output panel */
+        #output-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        #output-panel::-webkit-scrollbar-track {
+            background: #2727a0; /* zinc-800 */
+            border-radius: 4px;
+        }
+        #output-panel::-webkit-scrollbar-thumb {
+            background-color: #52525b; /* zinc-600 */
+            border-radius: 4px;
+        }
+        #output-panel::-webkit-scrollbar-thumb:hover {
+            background-color: #71717a; /* zinc-500 */
+        }
+        
+        /* Helper for hiding elements */
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script>
+        // Set Tailwind config
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        // Using zinc, a nice neutral dark palette
+                        zinc: {
+                            50: '#fafafa',
+                            100: '#f4f45',
+                            200: '#e4e4e7',
+                            300: '#d4d4d8',
+                            400: '#a1a1aa',
+                            500: '#71717a',
+                            600: '#52525b',
+                            700: '#3f3f46',
+                            800: '#2727a0',
+                            900: '#18181b',
+                            950: '#09090b',
+                        },
+                    }
+                },
+            },
+        };
+    </script>
+</head>
+
+<body class="h-full bg-zinc-950 text-zinc-300 flex flex-col">
+
+    <!-- Header -->
+    <header class="flex-shrink-0 bg-zinc-900 border-b border-zinc-700">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="flex h-14 items-center justify-between">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <svg class="h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
+                        <path d="M9 9h6"/>
+                        <path d="M12 7v7"/>
+                        <path d="M15 9h-6"/>
+                    </svg>
+                    <h1 class="text-xl font-semibold text-zinc-100">RISC-V Web Assembler</h1>
+                </div>
+                
+                <!-- Header Actions -->
+                <div class="flex items-center space-x-2">
+                    <!-- Removed Gemini Button -->
+                    <button id="assemble-btn" class="flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Assemble
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content (2-panel layout) -->
+    <main class="flex-1 flex flex-col md:flex-row min-h-0 p-4 gap-4">
+
+        <!-- Left Panel: ASM Input -->
+        <div class="flex-1 flex flex-col min-h-0 md:h-full">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-lg font-semibold text-zinc-100">Assembly Input (.asm)</h2>
+                <div class="flex items-center space-x-2">
+                    <!-- Removed Explain Button -->
+                    <input type="file" id="file-upload" class="hidden" accept=".asm, .s, .txt">
+                    <button id="load-file-btn" class="flex items-center justify-center gap-1.5 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-300 hover:bg-zinc-700 transition-colors" title="Upload .asm file">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-upload"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                        Upload
+                    </button>
+                </div>
+            </div>
+            <!-- CodeMirror editor will replace this textarea -->
+            <textarea id="asm-input" class="flex-1 w-full p-3 bg-zinc-900 border border-zinc-700 rounded-md font-mono text-sm resize-none" placeholder=".data&#10;hello: .asciz &#34;Hello, RISC-V!&#34;&#10;&#10;.text&#10;.globl main&#10;main:&#10;    lui a0, %hi(hello)&#10;    addi a0, a0, %lo(hello)&#10;    ..."></textarea>
+        </div>
+
+        <!-- Right Panel: MC Output -->
+        <div class="flex-1 flex flex-col min-h-0 md:h-full">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-lg font-semibold text-zinc-100">Machine Code Output (.mc)</h2>
+                <button id="download-mc-btn" class="hidden flex items-center justify-center gap-1.5 rounded-md bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-300 hover:bg-zinc-700 transition-colors" title="Download .mc file">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    Download
+                </button>
+            </div>
+            <!-- Output panel -->
+            <pre id="output-panel" class="flex-1 w-full p-3 bg-zinc-900 border border-zinc-700 rounded-md font-mono text-sm overflow-auto text-zinc-500" aria-live="polite">// Output will appear here...</pre>
+        </div>
+    </main>
+    
+    <!-- Status Bar (for loading messages) -->
+    <footer id="status-bar" class="flex-shrink-0 h-8 flex items-center px-4 bg-zinc-900 border-t border-zinc-700 text-sm text-zinc-400">
+        <div id="status-icon" class="flex items-center justify-center mr-2">
+             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <span id="status-message">Ready.</span>
+    </footer>
+
+    <!-- Modal for Gemini Code Generation (Removed) -->
+    
+    <!-- Main Page Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- Element References ---
+            const loadFileBtn = document.getElementById('load-file-btn');
+            const fileUploadInput = document.getElementById('file-upload');
+            const assembleBtn = document.getElementById('assemble-btn');
+            const downloadMcBtn = document.getElementById('download-mc-btn');
+            const outputPanel = document.getElementById('output-panel');
+            // const explainBtn = document.getElementById('explain-btn'); // Removed
+            
+            // Status Bar
+            const statusBar = document.getElementById('status-bar');
+            const statusMessage = document.getElementById('status-message');
+            const statusIcon = document.getElementById('status-icon');
+            
+            // Removed Gemini Modal References
+
+            // This will hold the uploaded .asm file
+            let currentAsmFile = null;
+            let currentMcContent = "";
+            let asmEditor;
+
+            // --- 1. CodeMirror Initialization ---
+            try {
+                asmEditor = CodeMirror.fromTextArea(document.getElementById('asm-input'), {
+                    lineNumbers: true,       // Show line numbers
+                    mode: 'gas',             // Use GNU Assembler syntax mode
+                    theme: 'vsc-dark',       // Use VS Code dark theme
+                    lineWrapping: true,      // Wrap long lines
+                    indentUnit: 4,           // Indent size
+                });
+                
+                // Set initial size
+                asmEditor.setSize("100%", "100%");
+                
+                // Refresh editor after a short delay to ensure it renders correctly
+                setTimeout(() => asmEditor.refresh(), 10);
+                
+                // explainBtn.classList.remove('hidden'); // Removed
+
+            } catch (e) {
+                console.error("Failed to initialize CodeMirror:", e);
+                // Fallback or error message
+                updateStatus("Failed to load code editor.", "error");
+            }
+
+
+            // --- 2. Status Bar Functions ---
+            const statusIcons = {
+                loading: `<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12A9 9 0 1 1 6.01 6.01"/></svg>`,
+                success: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+                error: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`,
+                warning: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>`,
+                info: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></svg>`
+            };
+            
+            function updateStatus(message, type = 'info') {
+                statusMessage.textContent = message;
+                statusIcon.innerHTML = statusIcons[type] || statusIcons.info;
+            }
+
+            // --- 3. Output Panel Functions ---
+            function setOutput(content, type = 'info') {
+                outputPanel.textContent = content;
+                // Clear existing color classes
+                outputPanel.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400', 'text-zinc-300', 'text-zinc-500');
+                
+                switch(type) {
+                    case 'success':
+                        outputPanel.classList.add('text-zinc-300'); /* No color for success */
+                        break;
+                    case 'error':
+                        outputPanel.classList.add('text-red-400');
+                        break;
+                    case 'warning':
+                        outputPanel.classList.add('text-yellow-400');
+                        break;
+                    case 'info':
+                        outputPanel.classList.add('text-zinc-300'); // Brighter for info
+                        break;
+                    default:
+                        outputPanel.classList.add('text-zinc-500'); // Default placeholder
+                }
+            }
+            
+            // --- 4. File Handling ---
+            loadFileBtn.addEventListener('click', () => {
+                fileUploadInput.click();
+            });
+
+            fileUploadInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    asmEditor.setValue(content); // Set content in CodeMirror
+                    // Create a File object to send to backend, as if it was uploaded
+                    currentAsmFile = new File([content], file.name, { type: file.type });
+                    updateStatus(`Loaded ${file.name}`, 'success');
+                    setOutput(`// Loaded ${file.name}\n// Click "Assemble" to continue.`, 'info');
+                    downloadMcBtn.classList.add('hidden');
+                };
+                reader.onerror = () => {
+                    updateStatus(`Failed to read ${file.name}`, 'error');
+                    setOutput(`// Error reading file ${file.name}`, 'error');
+                };
+                reader.readAsText(file);
+                
+                // Reset input to allow loading the same file again
+                event.target.value = null;
+            });
+
+            // --- 5. Assembler Logic ---
+            assembleBtn.addEventListener('click', async () => {
+                const asmContent = asmEditor.getValue(); // Get content from CodeMirror
+                if (!asmContent.trim()) {
+                    setOutput("// Assembly input is empty.", 'warning');
+                    updateStatus("Assembly input empty.", 'warning');
+                    return;
+                }
+                
+                // Create a file object from the editor content
+                currentAsmFile = new File([asmContent], "editor.asm", { type: "text/plain" });
+
+                const formData = new FormData();
+                formData.append('file', currentAsmFile);
+
+                updateStatus('Assembling...', 'loading');
+                setOutput('// Assembling code...', 'info');
+                downloadMcBtn.classList.add('hidden');
+
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const resultText = await response.text();
+                    
+                    if (response.ok) {
+                        currentMcContent = resultText;
+                        setOutput(resultText, 'success');
+                        updateStatus('Assembly successful.', 'success');
+                        downloadMcBtn.classList.remove('hidden');
+                    } else {
+                        currentMcContent = "";
+                        // Server errors (500) or user errors (400)
+                        setOutput(`// --- Assembly Failed ---\n\n${resultText}`, 'error');
+                        updateStatus('Assembly failed.', 'error');
+                    }
+                } catch (error) {
+                    currentMcContent = "";
+                    console.error('Fetch error:', error);
+                    setOutput(`// --- Network Error ---\n\n${error.message}`, 'error');
+                    updateStatus('Network error.', 'error');
+                }
+            });
+
+            // --- 6. Download Logic ---
+            downloadMcBtn.addEventListener('click', () => {
+                if (!currentMcContent) return;
+
+                const blob = new Blob([currentMcContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                
+                // Get original filename or default
+                let originalName = 'editor';
+                if (currentAsmFile && currentAsmFile.name) {
+                    originalName = currentAsmFile.name.split('.').slice(0, -1).join('.') || 'editor';
+                }
+                
+                a.href = url;
+                a.download = `${originalName}.mc`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                updateStatus('Downloaded .mc file.', 'success');
+            });
+            
+            
+
+        });
+    </script>
+</body>
+</html>
