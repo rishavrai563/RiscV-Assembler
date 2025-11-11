@@ -14,6 +14,10 @@
 This project implements a **two-pass assembler** for the **RISC-V 64-bit Instruction Set Architecture (RV64I)**.  
 It translates assembly source code (`.asm`) into machine-code output (`.mc`), handling labels, directives, and instruction encoding with high accuracy.
 
+## 👨‍💻 Authors
+
+- Rishav Kumar — 2024AIB1014  
+- Parth — 2024AIB1012
 ### ✨ Features
 - ✅ Full support for **R, I, S, SB, U, and UJ formats**  
 - ✅ Handles directives: `.text`, `.data`, `.byte`, `.half`, `.word`, `.dword`, `.asciz`  
@@ -128,10 +132,7 @@ IIT Ropar FCS Mini Project Specification (2025)
 Distributed under the MIT License
 .
 
-## 👨‍💻 Authors
 
-- Rishav Kumar — 2024AIB1014  
-- Parth — 2024AIB1012
 
 
 ```
