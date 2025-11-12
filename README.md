@@ -22,7 +22,7 @@ Additionally, it features a **web-based interface** built with **Flask** and **H
 ## 👨‍💻 Authors
 
 - **Rishav Kumar** — 2024AIB1014  
-- **Parth** — 2024AIB1012  
+- **Path** — 2024AIB1012  
 
 ---
 
